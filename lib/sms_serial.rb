@@ -14,6 +14,7 @@ end
 class SmsSerial
   using ColouredText
 
+  attr_reader :t
 
   def initialize(dev='/dev/ttyUSB0', callback: nil, debug: false)
 
@@ -29,12 +30,16 @@ class SmsSerial
 
         message = @sp.read
         if message.length > 0
-
+    
+          callback.call(message) if callback and @debug
+    
           if message =~ /^\+CMTI:/ then
             callback.call(message.lines[2]) if callback
           else
 
+            Thread.current[:v] ||= []
             Thread.current[:v]  << message 
+
           end
         end
       end
@@ -103,8 +108,10 @@ class SmsSerial
   #
   def cmd(s)
 
-    @sp.write "AT+%s\r\n" % [s]
-    sleep 1.5 # give the above command time to be processed by the SIM module
+    puts ('inside cmd s: ' + s.inspect).debug if @debug
+    r2 = @sp.write "AT+%s\r\n" % [s]
+    puts 'r2: ' + r2.inspect if @debug
+    puts '@t[:v] ' + @t[:v].inspect if @debug
     
     r = read_buffer
 
@@ -117,18 +124,28 @@ class SmsSerial
   end
 
   def read_buffer()
-    @t[:v].any? ? @t[:v].shift : ''
+    
+    sleep 2 if @debug
+
+    puts 'inside read_buffer @t[:v]: ' + @t[:v].inspect if @debug
+    r = ''
+    @t[:v].any? ? (r += @t[:v].shift until @t[:v].empty?).to_s : r = ''
+    
+    puts 'read_buffer r: ' + r.inspect if @debug
+    r
+    
   end
 
   def parse_msg(r)
 
     puts ('parse_msg r: ' + r.inspect).debug if @debug
     return if r.empty?
-    heading = r.lines[2][/\+CMG[RL]: (?:\d+,)?(.*)/,1]
+    heading = r.lines[2][/\+CMG[RL]: (?:[^,]+,)?(.*)/,1]
+    puts ('heading: ' + heading.inspect).debug if @debug
 
     raise SmsSerialError, "Message not found" unless heading
 
-    sender, sent = CSV.parse(heading).first.values_at(1,3)
+    sender, sent = CSV.parse(heading).first.values_at(0,2)
     {sender: sender, sent: Time.parse(sent), body: r.lines[4].rstrip}
 
   end
