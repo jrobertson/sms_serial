@@ -20,7 +20,6 @@ class SmsSerial
     @debug = debug
     @sp = SerialPort.new dev, 115200    
     puts 'running ' + "SmsSerial".highlight 
-    @buffer = []
 
     @t = Thread.new {
 
@@ -49,22 +48,24 @@ class SmsSerial
 
     puts 'inside count'.info if @debug
 
-    r = cmd 'CPMS?'
-    puts 'r: ' + r.inspect if @debug
-    total = r.lines[2].split(',')[1].to_i
-    puts ('message count: ' + total.to_s).debug if @debug
+    cmd 'CPMS?' do |r|
+      puts 'r: ' + r.inspect if @debug
+      total = r.lines[2].split(',')[1].to_i
+      puts ('message count: ' + total.to_s).debug if @debug
 
-    total
-
+      total
+    end
+    
   end
 
   def delete(idx)
 
-    r = cmd 'CMD'
-    total = r.lines[2].split(',')[1].to_i
-    puts ('message count: ' + total.to_s).debug if @debug
+    cmd 'CMD' do |r|
+      total = r.lines[2].split(',')[1].to_i
+      puts ('message count: ' + total.to_s).debug if @debug
 
-    total
+      total
+    end
 
   end
 
@@ -84,18 +85,15 @@ class SmsSerial
     @sp.write %Q(AT+CMGL="ALL"\r\n)
     n.times.map {r = read_buffer; parse_msg(r)}
 
-    if n < 1 then
-      r = read_buffer
-      []
-    end
+    flush_output() if n < 1
+
   end
 
   # read an SMS message
   #
   def read(idx=1)
 
-    r = cmd 'CMGR=' + idx.to_s
-    parse_msg r
+    cmd('CMGR=' + idx.to_s) {|r| parse_msg r }
 
   end
 
@@ -106,11 +104,16 @@ class SmsSerial
   def cmd(s)
 
     @sp.write "AT+%s\r\n" % [s]
-    sleep 1.5 # give the command time to be processed by the SIM module
-    r = ''
+    sleep 1.5 # give the above command time to be processed by the SIM module
+    
     r = read_buffer
 
-    return r
+    block_given? ? yield(r) : r
+  end
+
+  def flush_output()
+    r = read_buffer
+    []
   end
 
   def read_buffer()
@@ -125,12 +128,9 @@ class SmsSerial
 
     raise SmsSerialError, "Message not found" unless heading
 
-    a = CSV.parse(heading)
-    sender, sent = a.first.values_at(1,3)
-    msg = {header: {sender: sender, sent: Time.parse(sent)}, 
-      body: r.lines[4].rstrip}
+    sender, sent = CSV.parse(heading).first.values_at(1,3)
+    {sender: sender, sent: Time.parse(sent), body: r.lines[4].rstrip}
 
   end
 
 end
-
