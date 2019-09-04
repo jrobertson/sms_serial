@@ -98,7 +98,14 @@ class SmsSerial
   #
   def read(idx=1)
 
-    cmd('CMGR=' + idx.to_s) {|r| parse_msg r }
+    cmd('CMGR=' + idx.to_s) do |r| 
+      begin
+        parse_msg r 
+      rescue SmsSerialError => e
+        puts 'Invalid message no.'.warning
+        nil
+      end
+    end
 
   end
 

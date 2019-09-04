@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'sms_serial'
-  s.version = '0.1.3'
+  s.version = '0.1.4'
   s.summary = 'Reads SMS messages from a serial connection to an Arduino '+
       'compatible board which uses an SMS module.'
   s.authors = ['James Robertson']
