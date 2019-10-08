@@ -42,6 +42,9 @@ class SmsSerial
 
           end
         end
+    
+        sleep 0.3
+    
       end
     }
     
@@ -64,6 +67,8 @@ class SmsSerial
   end
 
   def delete(idx)
+    
+    return delete_all() if idx.to_sym == :all
 
     cmd 'CMD' do |r|
       total = r.lines[2].split(',')[1].to_i
@@ -73,6 +78,8 @@ class SmsSerial
     end
 
   end
+  
+  alias del delete
 
   def delete_all()
 
